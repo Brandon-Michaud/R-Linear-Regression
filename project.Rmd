@@ -1,0 +1,365 @@
+---
+title: "Project 2"
+author: "Brandon Michaud"
+date:  "`r format(Sys.time(), '%d %B, %Y')`"
+output:
+  html_document:
+    code_folding: show
+    csl: biomed-central.csl
+    df_print: paged
+    fig_caption: yes
+    fig_height: 6
+    fig_width: 7
+    number_sections: yes
+    theme: journal
+    toc: yes
+    toc_float: yes
+  pdf_document:
+    df_print: kable
+    fig_caption: yes
+    fig_height: 6
+    fig_width: 7
+    highlight: tango
+    toc: yes
+    toc_depth: 4
+  word_document:
+    toc: yes
+    toc_depth: 4
+bibliography: project.bib
+abstract: This project is all about applications of SLR to real data using R. I will be using a dataset that contains information about the performance statistics associated with gas turbines augmented with high-pressure inlet fogging. My project data is taken from a practice problem in William M. Mendenhall & Terry L. Sincich’s textbook, Statistics for Engineering and the Sciences, 6th (2016). I will use the textbook, dataset, slides, and my own knowledge gained throughout the semester to perform a SLR analysis using R. The goal of this analysis is to determine the relationship between air flow rate and heat rate of gas turbines augmented with high-pressure inlet fogging.
+---
+
+<center>
+
+![Brandon Michaud](brandon.jpg "My Picture"){ width=20% }
+
+</center>
+
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Introduction
+
+Society needs energy, and one of the best ways we have developed to generate energy is through gas turbines. These gas turbines work by taking in air from the surroundings and compressing it, which increases the pressure and temperature. Next, the fuel, natural gas, is mixed with the compressed air, which causes it to burn and releases energy. This mixture then moves through the turbine blades which causes them to spin with speeds that can exceed 25,000 rotations per minute. For reference, say your car wheels are 14 inches in diameter, if you are traveling at 120 miles per hour, then your wheels will only be spinning at about 2881 rotations per minute. These turbine blades are connected to a drive shaft, which causes the shaft to rotate with the same speed. Magnets are often, but not always, connected on the other end of the drive shaft. These magnets are surround by copper coils not connected to the shaft. When the shaft and magnets spin, electricity is induced in the coils and is then used and distributed as necessary [see @gepower].
+
+![<a href=https://energyeducation.ca/wiki/images/thumb/3/3d/Natgasturb.png/800px-Natgasturb.png>Gas Turbine Diagram</a>](Turbine Diagram.png "Gas Turbine Diagram"){ width=80% }
+
+Some more advanced gas turbines can generate up to 50% more power when combined with steam turbines. In this combined-cycle, the heated mixture released by the gas turbine is used to boil water which creates steam that spins turbine blades and generates electricity using the same procedure as the gas turbine. This combined-cycle procedure is the most efficient way to generate electricity [see @gepower].
+
+![<a href=https://brdgstn.com/wp-content/uploads/2020/05/combined-cycle-cogeneration-flow-diagram.png>Combined Cycle Diagram</a>](Combined Cycle.png "Combined Cycle Diagram"){ width=80% }
+
+Gas turbines should not be confused with gas engines, like the ones found in cars. Engines use a similar air and gas mixture ignition system, but use it to push pistons rather than spin turbine blades [see @linquip]. While not associated with automobiles, gas turbines are synonymous with large-scale energy generation. They are found in aircraft, trains, ships, power plants, pumps, and compressors, along with other energy-intensive machinery. 
+
+![<a href=https://sviindustrial.com/wp-content/uploads/2020/03/The-Difference-Between-Steam-and-Gas-Turbines.jpg>Power Plant Gas Turbine</a>](Gas Turbine.jpg "Power Plant Gas Turbine"){ width=80%}
+
+![<a href=https://storage.googleapis.com/mcp_236blog/uploads/2018/12/Jet-engine-KLM-1920x1000.jpg>Aircraft Gas Turbine</a>](Plane Turbine.jpg "Aircraft Gas Turbine"){ width=80% }
+
+Because they are so prevalent in modern society, we are very familiar with the scenarios in which gas turbines struggle. One such inefficiency is during hot summer months or in warm climates when the inlet air is already hot. This causes a drop in power output. One way to counter this drop is with high-pressure inlet fogging. This technique uses high-pressure deionized water which is introduced into the gas turbine intake as a fine mist. This mist then evaporates immediately in a process that removes energy from the air and results in cooler temperatures. At these cooler temperatures, mass airflow is increased because the molecules are more compressed and, in turn, the turbine efficiency is improved [see @catpumps].
+
+## My Interest in the Data
+
+As an engineer, I have a distinct affinity for learning how machinery works and ways it can be improved. In fact, before I switched to only computer science, I was double majoring in mechanical engineering because of my curiosity for how machines work, the physics behinds them, and how to make them. Turbines are the pinnacle of this curiosity because they combine many different aspects of physics and engineering to perform a task that is vital to society's prosperity. As such, I find it important to understand relationships involved in turbines so that they may be improved and, as a result, society can further prosper.
+
+## The Data
+
+In a study published in the Journal of Engineering for Gas Turbines and Power in January, 2005, researchers presented their findings for performance measures of a sample of 67 gas turbines augmented with high-pressure inlet fogging. They measured 1 categorical variable, engine type, which could be a traditional engine, advanced engine, or aeroderivative engine. They also measured 10 numerical variables. Only 1 of these numerical variables was discrete: The number of shafts. The 9 continuous variables are cycle speed (RPM), cycle pressure ratio (N/A), inlet temperature (degrees C), exhaust temperature (degrees C), air flow rate (kg/s), power (kW), heat rate (kJ/kWh), lower heating value percentage (N/A), and isolated work (kJ).
+
+```{r}
+gasturb=read.csv("GASTURBINE.csv")
+head(gasturb)
+```
+
+## The Problem to be Solved
+
+Seeing as the gas turbines sampled use high-pressure inlet fogging to increase air flow rate, I will examine what, if any, relationship exists between air flow rate and heat rate. Heat rate is a measure of efficiency where lower values mean higher efficiency. With this analysis, engineers can determine if their efforts to increase the air flow rate are justified.
+
+## Preliminary Plots
+
+```{r}
+library(ggplot2)
+g = ggplot(gasturb, aes(x = AIRFLOW, y = HEATRATE)) + geom_point()
+g = g + geom_smooth(method = "loess")
+g
+```
+
+Based on this preliminary plot, there seems to be a negative, but non-linear relationship between airflow rate and heat rate, which does support the reasoning for high-pressure inlet fogging as presented by the engineers. Further statistical analysis will indicate the degree to which this relationship is true.
+
+# Theory for SLR
+
+It is the engineer's claim that as the airflow rate (x) increases, the heat rate (y) decreases, which is to say the efficiency increases. I wish to make a linear model relating airflow rate and heat rate by drawing a line through all the points which best represents the data. The airflow rate will be my independent variable and the heat rate will be my dependent variable.
+
+The data is not perfectly distributed along a line, so there are errors. Because of this error, I need to use a simple linear regression model (SLR). SLR is probabilistic, meaning it accounts for randomness of the dependent variable. SLR gives an equation for a straight line, and has a term to account for the deviation or error, &epsilon;. This equation is:
+
+\begin{equation}
+\begin{split}
+y_i = \beta_0 + \beta_{1}x_i + \epsilon_i
+\end{split}
+\end{equation}
+
+Where &beta;<sub>0</sub> and &beta;<sub>1</sub> are the unknown parameters that will be estimated, &beta;<sub>0</sub> + &beta;<sub>1</sub>x is the mean value for y<sub>i</sub> at the given x<sub>i</sub>, and &epsilon;<sub>i</sub> is the error as discussed above. The expected value of y using this equation is:
+
+\begin{equation}
+\begin{split}
+E(y_i) &= E(\beta_0 + \beta_{1}x_i + \epsilon_i)\\
+&= E(\beta_0) + E(\beta_{1}x_i) + E(\epsilon_i)\\
+&= \beta_0 + \beta_{1}x_i
+\end{split}
+\end{equation}
+
+Notice that &beta;<sub>0</sub>, &beta;<sub>1</sub>, and x<sub>i</sub> are all known constants and that E(&epsilon;<sub>i</sub>) = 0 because the mean of the probability distribution of &epsilon;<sub>i</sub> is 0. From this derivation, the mean value of any y at a given x will graph a straight line with a y-intercept of &beta;<sub>0</sub> and a slope of &beta;<sub>1</sub>
+
+In order for the SLR model to be valid, there are 4 assumptions pertaining to &epsilon;
+
+1. The mean of the probability distribution of &epsilon; is 0
+2. The variance of the probability distribution of &epsilon; is constant for all settings of the independent variable x, i.e. V(&epsilon;)=&sigma;<sup>2</sup>
+3. The probability distribution of &epsilon; is normal
+4. The errors associated with any two different observations are independent
+
+# SLR Estimation of the Parameters
+
+## Method
+
+To estimate the relationship between the airflow rate and heat rate, I will use the method of least squares. This methods finds the line for which the squares of the residuals are minimal. The residuals are the distances from observed points to the estimated point on the line. If the equation for our estimated line is: 
+
+\begin{equation}
+\hat{y_i} = \hat{\beta_0} + \hat{\beta_1}x_i
+\end{equation}
+
+Then the equation for residual is:
+\begin{equation}
+(y_i - \hat{y_i}) = y_i - (\hat{\beta_0} + \hat{\beta_1}x_i)
+\end{equation}
+ 
+Thus the residual sum of squares is:
+\begin{equation}
+RSS = \sum_{i=1}^{n}(y_i - \hat{y_i})^2 = \sum_{i=1}^{n}(y_i - (\hat{\beta_0} + \hat{\beta_1}x_i))^2
+\end{equation}
+
+If the model fits well, then the residuals should be approximately normally distributed with a mean of 0 and a constant variance, as those are the assumptions of SLR
+
+## Point Estimates
+
+```{r}
+gasturb.lm=lm(HEATRATE~AIRFLOW, data=gasturb)
+summary(gasturb.lm)
+```
+
+Using the linear model function in R, we get point estimate values of &beta;<sub>0</sub>=12257.4828 and &beta;<sub>1</sub>=-4.9464. The point estimate for the slope corroborates the claim made by the engineers, but we need an interval to be sure the relationship is negative.
+
+## Interval Estimates
+
+Using the confidence interval function for linear models with a 95% confidence level in R, the confidence intervals for the estimates are:
+```{r}
+confint.lm(gasturb.lm)
+```
+
+Interpreting these results, we are 95% confident that &beta;<sub>0</sub> is between 11849.08215 and 12665.88353, and we are 95% confident that &beta;<sub>1</sub> is between -6.18562 and -3.70719.
+
+# Checking Assumptions for SLR
+
+Plotting the SLR model with the data, we can see that a straight line visually does not seem to be a good fit for the data.
+```{r}
+plot(HEATRATE~AIRFLOW,data=gasturb,bg="Blue",pch=21,cex=1.2,xlim=c(0,max(AIRFLOW)*1.1),main="Heat Rate vs Air Flow Rate")
+abline(gasturb.lm)
+```
+
+## Plot of Data Deviations from Linear Model
+
+We can further check for fit by plotting residuals to help visualize deviations and the residual sum of squares (RSS)
+```{r}
+plot(HEATRATE~AIRFLOW,data=gasturb,bg="Blue",pch=21,cex=1.2,xlim=c(0,max(AIRFLOW)*1.1),main="Heat Rate vs Air Flow Rate")
+abline(gasturb.lm)
+yhat=fitted(gasturb.lm)
+with(gasturb,{
+segments(AIRFLOW,HEATRATE,AIRFLOW,yhat)
+})
+```
+
+
+## Plot of Linear Model Deviations from Mean
+
+We can plot the difference between the heat rates the model predicts and the mean heat rate for all of the data to visualize the model sum of squares (MSS)
+```{r}
+plot(HEATRATE~AIRFLOW,data=gasturb,bg="Blue",pch=21,cex=1.2,xlim=c(0,max(AIRFLOW)*1.1),main="Heat Rate vs Air Flow Rate")
+abline(gasturb.lm)
+abline(h=mean(gasturb$HEATRATE))
+with(gasturb,{
+segments(AIRFLOW,mean(HEATRATE),AIRFLOW,yhat, col="Red")
+})
+```
+
+## Plot of Data Deviations from Mean
+
+We can plot the difference between the data points and the mean heat rates at those points to help visualize the total sum of square (TSS)
+```{r}
+plot(HEATRATE~AIRFLOW,data=gasturb,bg="Blue",pch=21,cex=1.2,xlim=c(0,max(AIRFLOW)*1.1),main="Heat Rate vs Air Flow Rate")
+abline(h=mean(gasturb$HEATRATE))
+with(gasturb,{
+segments(AIRFLOW,mean(HEATRATE),AIRFLOW,HEATRATE, col="Green")
+})
+```
+
+## Calculate RSS, MSS, and TSS
+
+The RSS is:
+```{r}
+RSS=with(gasturb,sum((HEATRATE-yhat)^2))
+RSS
+```
+
+The MSS is:
+```{r}
+MSS=with(gasturb,sum((yhat-mean(HEATRATE))^2))
+MSS
+```
+
+The TSS is:
+```{r}
+TSS=with(gasturb,sum((HEATRATE-mean(HEATRATE))^2))
+TSS
+```
+
+The multiple R<sup>2</sup> is MSS/TSS and is a measure of how well the trend line fits the data. The multiple R<sup>2</sup> is:
+```{r}
+MSS/TSS
+```
+
+This value is not very close to 1, meaning that the SLR model is not a very good fit for the data
+
+## Lowess Smoother Scatter Plot
+
+We can use a Lowess smoother scatter plot to better visualize the relationship and possible lines of best fit:
+```{r}
+library(s20x)
+trendscatter(HEATRATE~AIRFLOW, f = 0.5, data = gasturb)
+```
+
+This plot does not indicate a linear relationship and the red boundaries showing possible lines of best fit do not allow for a straight line relationship either.
+
+## Residuals vs Fitted Values
+
+Plotting the residuals vs the fitted values helps to determine if the model fits:
+```{r}
+heatrate.res = residuals(gasturb.lm)
+heatrate.fit = fitted(gasturb.lm)
+trendscatter(heatrate.fit, heatrate.res)
+```
+
+If the model fits, we would expect to see residuals symmetric about 0. This plot shows the model fits well for small heat rates, but when the values get larger the residuals are more skewed towards the negative side
+
+## Shapiro-Wilk Test
+
+We can test if the residuals are normally distributed using the Shapiro-Wilk normality test:
+```{r}
+normcheck(gasturb.lm, shapiro.wilk = T)
+```
+
+The null hypothesis for this check is that the residuals are distributed normally with a mean of 0 and constant variance. The p-value, 0.001, is very small, indicating we have sufficient evidence to reject the null hypothesis. This means that the SLR model does not fit
+
+## Validity of Each Assumption
+
+* The first assumption of SLR, E(&epsilon;)=0, is not upheld. This can be seen in the plot of the residuals versus the fitted values. Because there are significantly more residuals below 0, the assumption is invalid.
+* The second assumption of SLR, V(&epsilon;)=&sigma;<sup>2</sup>, is also not upheld. This is because in the residuals versus fitted values plot, the residuals are closer to zero for small fitted heat rate values than they are for larger fitted heat rate values, meaning the residuals variate more for larger fitted heat rates. This difference in variations means the assumption that the variance of the residuals is constant is not valid.
+* The third assumption of SLR, &epsilon; ~ N is also not valid because the Shapiro-Wilk test rejected the null hypothesis that &epsilon; is normally distributed.
+* The last assumption of SLR, errors are independent, is assumed to be valid, because although the sampling methods are not stated, I assume them to be a simple random sample of gas turbines augmented with high-pressure inlet fogging.
+
+# Quadratic Model
+
+Seeing as the linear model does not appear to be a good fit for the relationship between air flow rate and heat rate, I am going to try a quadratic model
+```{r}
+quad.lm = lm(HEATRATE~AIRFLOW + I(AIRFLOW^2), data = gasturb)
+summary(quad.lm)
+```
+
+The R<sup>2</sup> is still only 0.5332 for this model, meaning even though it is a better fit than the SLR model, it is not a great fit. This can be seen visually when I plot it against the data:
+```{r}
+plot(HEATRATE~AIRFLOW, main = "Heat Rate vs Air Flow Rate", data = gasturb)
+myplot = function(x) {
+ quad.lm$coef[1] + quad.lm$coef[2] * x  + quad.lm$coef[3] * x^2
+} 
+curve(myplot, lwd = 2, col = "steelblue", add = TRUE)
+```
+
+By plotting a residuals versus fitted values plot we can see that the model again does not fit well because the residuals are not normally distributed about 0:
+```{r}
+plot(quad.lm, which = 1)
+```
+
+The residuals are again skewed towards the negative side for larger fitted heat rate values.
+
+The Shapiro-Wilk check further confirms the poor fit:
+```{r}
+normcheck(quad.lm, shapiro.wilk = T)
+```
+
+With a p-value of 0.006, we again reject the null hypothesis and conclude that the model does not fit.
+
+# Comparison of the Two Models
+
+## Predictions
+
+While neither model fits, let us see the difference in between their predicted values for the heat rate when the air flow rate is 12, 139, and 241 kg/s.
+```{r}
+predict(gasturb.lm, data.frame(AIRFLOW=c(12,139,241)))
+predict(quad.lm, data.frame(AIRFLOW=c(12,139,241)))
+```
+
+The quadratic model predicts larger heat rates for small air flow rates than the SLR model, but smaller heat rates for medium to large air flow rates than the SLR model. These predicted values are relatively close to one another, however. 
+
+## Comparison of R<sup>2</sup> values
+
+For the linear model, the multiple R<sup>2</sup> was 0.4944 and the adjusted R<sup>2</sup> was 0.4866. For the quadratic model, the multiple R<sup>2</sup> was 0.5332 and the adjusted R<sup>2</sup> was 0.5186. The quadratic model is a better fit than the linear model because it has a higher multiple R<sup>2</sup> and adjusted R<sup>2</sup>. The adjusted R<sup>2</sup> factors in complexity of the model, so even though the quadratic model is more complex, it explains more of the TSS enough to justify it fitting better than the linear model. That being said, neither model is a good fit at the end of the day.
+
+## Using Anova to compare
+
+We can use the anova function in R to run a hypothesis test to see which model is better. In this case, the null hypothesis is that the SLR model is better.
+```{r}
+anova(gasturb.lm, quad.lm)
+```
+
+The p-value is very small, meaning we reject the null hypothesis and conclude that the quadratic model is the better fit for the data.
+
+# Checking for Outliers
+
+Cook’s distance is the measurement of the impact a data point has on a least-squares regression. This can help identify areas that need more data or need to be checked for validity.
+```{r}
+cooks20x(gasturb.lm)
+```
+
+Cook's distance for the SLR model indicates that observation 61 has a particularly large impact on the data. We can remove this observation and find another SLR model for the new data and see if it is a better fit.
+```{r}
+gasturb2.lm=lm(HEATRATE~AIRFLOW, data=gasturb[-61,])
+summary(gasturb2.lm)
+```
+
+Removing this data point did increase the multiple R<sup>2</sup> from 0.4944 to 0.514, but this does not create a big enough difference for it to be a valid model
+
+The same procedure can be conducted for the quadratic model.
+```{r}
+cooks20x(quad.lm)
+quad2.lm = lm(HEATRATE~AIRFLOW + I(AIRFLOW^2), data = gasturb[-61,])
+summary(quad2.lm)
+```
+
+The multiple R<sup>2</sup> increased for this model too, from 0.5332 to 0.5457, but once again, this does not create a big enough difference for the model to fit.
+
+# Conclusion
+
+## Results of Analysis
+
+Using the sample of gas turbines augmented with high-pressure inlet fogging, I sought to determine what, if any, relationship existed between air flow rate and heat rate, because the goal of high-pressure inlet fogging is to increase air flow rate which is theorized to decrease heat rate and improve efficiency. If there did appear to be a relationship, I wanted to determine if it was linear, quadratic, or something else.
+
+Based off of the SLR model for the data, a linear model does not fit because the assumptions for SLR were invalid and the multiple R<sup>2</sup> was below 0.5. I then used a quadratic model for data, but that also had a small multiple R<sup>2</sup> and thus did not fit the data. Using a lowess smoother scatter plot, however, it can be seen that there is a negative relationship between air flow rate and heat rate, but it is something other than linear or quadratic. While we do not have a model to accurately predict the heat rate at a given air flow rate, the knowledge that the relationship is negative is significant because it confirms the engineer's reasoning for high-pressure inlet fogging. 
+
+## Future Suggestions
+
+Further modeling of the data using techniques we were not taught would help to generate an equation with which the heat rate at a specified air flow rate can be approximated with relative accuracy. This would help engineers determine at what point increasing air flow rate does not generate a large enough decrease in heat rate to justify the costs. Another improvement could be to increase the sample size to minimize the chances of having an unrepresentative sample that could be skewed by outliers. Further analysis could also be conducted which separates the engines by type and generates a model of the same relationship for each type of engine. 
+
+Other relationships that could be of value and thus should be examined are: air flow rate versus inlet temperature, power output versus airflow rate, and isolated work versus inlet temperature. These relationships would give engineers an even better understanding of the effects of high-pressure inlet fogging.
+
+By implementing these suggestions, along with many others, engineers can make the most informed decisions pertaining to augmenting gas turbines with high-pressure inlet fogging. This will positively impact energy generation and result in a more prosperous society.
+
+# References
